@@ -370,9 +370,9 @@ export function LiveConciergePanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border border-[#E5E0D8] rounded-xl overflow-hidden">
+    <div className="flex flex-col h-full bg-white border border-[#C8BEB0] rounded-xl overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-[#E5E0D8] bg-[#FAF9F6] flex items-center justify-between gap-4">
+      <div className="px-5 py-4 border-b border-[#C8BEB0] bg-[#FAF9F6] flex items-center justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-semibold text-[#1C1917] truncate">
@@ -390,7 +390,7 @@ export function LiveConciergePanel({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center p-0.5 bg-[#EFECE6] rounded-lg border border-[#E5E0D8]">
+          <div className="flex items-center p-0.5 bg-[#EFECE6] rounded-lg border border-[#C8BEB0]">
             <button
               type="button"
               onClick={() => setRole('customer')}
@@ -424,7 +424,7 @@ export function LiveConciergePanel({
       </div>
 
       {/* Sub-navigation Tabs */}
-      <div className="px-5 py-2.5 border-b border-[#E5E0D8] bg-white flex flex-wrap items-center justify-between gap-2">
+      <div className="px-5 py-2.5 border-b border-[#C8BEB0] bg-white flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -460,7 +460,7 @@ export function LiveConciergePanel({
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               notificationPermission === 'granted' && notificationsEnabled
                 ? 'bg-[#FAF9F6] border-[#9A7B4F] text-[#7D623C]'
-                : 'bg-white border-[#E5E0D8] text-[#57534E] hover:border-[#9A7B4F] hover:text-[#1C1917]'
+                : 'bg-white border-[#C8BEB0] text-[#57534E] hover:border-[#9A7B4F] hover:text-[#1C1917]'
             }`}
           >
             {notificationPermission === 'granted' && notificationsEnabled ? (
@@ -514,7 +514,7 @@ export function LiveConciergePanel({
                   <div
                     className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
                       isStaff
-                        ? 'bg-white border border-[#E5E0D8] text-[#1C1917]'
+                        ? 'bg-white border border-[#C8BEB0] text-[#1C1917]'
                         : 'bg-[#1C1917] text-[#FAF9F6]'
                     }`}
                   >
@@ -522,7 +522,7 @@ export function LiveConciergePanel({
                       <div
                         className={`mb-2 pb-2 border-b text-xs ${
                           isStaff
-                            ? 'border-[#F0ECE4] text-[#7D623C]'
+                            ? 'border-[#D6CCC0] text-[#7D623C]'
                             : 'border-white/15 text-[#E5D3B3]'
                         }`}
                       >
@@ -540,7 +540,7 @@ export function LiveConciergePanel({
 
           {/* Reservation Status Strip for Staff or Recent Bookings */}
           {reservations.length > 0 && (
-            <div className="px-5 py-3 border-t border-[#E5E0D8] bg-[#F6F4EF] max-h-36 overflow-y-auto">
+            <div className="px-5 py-3 border-t border-[#C8BEB0] bg-[#F6F4EF] max-h-36 overflow-y-auto">
               <div className="flex items-center justify-between text-xs font-medium text-[#57534E] mb-2">
                 <span>실시간 방문 예약 현황 ({reservations.length}건)</span>
                 {role === 'staff' && <span className="text-[#9A7B4F]">매니저 상태 변경 가능</span>}
@@ -549,7 +549,7 @@ export function LiveConciergePanel({
                 {reservations.slice(-3).reverse().map((res) => (
                   <div
                     key={res.id}
-                    className="flex flex-wrap items-center justify-between gap-2 text-xs bg-white px-3 py-2 rounded-lg border border-[#E5E0D8]"
+                    className="flex flex-wrap items-center justify-between gap-2 text-xs bg-white px-3 py-2 rounded-lg border border-[#C8BEB0]"
                   >
                     <div className="flex items-center gap-2 text-[#1C1917] min-w-0">
                       <UserCheck className="w-3.5 h-3.5 text-[#9A7B4F] shrink-0" />
@@ -586,9 +586,9 @@ export function LiveConciergePanel({
           )}
 
           {/* Composer */}
-          <form onSubmit={handleChatSubmit} className="p-4 border-t border-[#E5E0D8] bg-white space-y-2.5">
+          <form onSubmit={handleChatSubmit} className="p-4 border-t border-[#C8BEB0] bg-white space-y-2.5">
             {attachedItem && (
-              <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[#FAF9F6] border border-[#D6CFC4] rounded-lg text-xs">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[#FAF9F6] border border-[#B5A897] rounded-lg text-xs">
                 <span className="text-[#1C1917] truncate">
                   선택된 상품: <strong className="font-medium">{attachedItem.name}</strong> (
                   {formatKrw(attachedItem.priceKrw)})
@@ -610,7 +610,7 @@ export function LiveConciergePanel({
                     key={q}
                     type="button"
                     onClick={() => setChatText(q)}
-                    className="px-2.5 py-1 text-[11px] text-[#57534E] bg-[#FAF9F6] border border-[#E5E0D8] hover:border-[#9A7B4F] rounded-md transition-colors cursor-pointer"
+                    className="px-2.5 py-1 text-[11px] text-[#57534E] bg-[#FAF9F6] border border-[#C8BEB0] hover:border-[#9A7B4F] rounded-md transition-colors cursor-pointer"
                   >
                     {q}
                   </button>
@@ -626,7 +626,7 @@ export function LiveConciergePanel({
                   onChange={(e) => setSenderName(e.target.value)}
                   placeholder="성함"
                   aria-label="성함"
-                  className="w-24 sm:w-28 px-3 py-2.5 text-xs bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                  className="w-24 sm:w-28 px-3 py-2.5 text-xs bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
                 />
               )}
               <input
@@ -638,7 +638,7 @@ export function LiveConciergePanel({
                     ? '고객에게 보낼 실시간 답변을 입력하세요...'
                     : '예약 또는 주얼리 문의사항을 입력하세요...'
                 }
-                className="flex-1 min-w-0 px-3.5 py-2.5 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                className="flex-1 min-w-0 px-3.5 py-2.5 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
               />
               <button
                 type="submit"
@@ -664,7 +664,7 @@ export function LiveConciergePanel({
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="홍길동"
-                className="w-full px-3.5 py-2 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                className="w-full px-3.5 py-2 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
               />
             </div>
             <div>
@@ -675,13 +675,13 @@ export function LiveConciergePanel({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="010-0000-0000"
-                className="w-full px-3.5 py-2 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                className="w-full px-3.5 py-2 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
               />
             </div>
           </div>
 
           {/* Visual Calendar Date & Time Picker */}
-          <div className="p-3.5 sm:p-4 bg-[#FAF9F6] border border-[#E5E0D8] rounded-xl space-y-3.5">
+          <div className="p-3.5 sm:p-4 bg-[#FAF9F6] border border-[#C8BEB0] rounded-xl space-y-3.5">
             {/* Calendar Month Header */}
             <div className="flex items-center justify-between gap-2">
               <div>
@@ -698,7 +698,7 @@ export function LiveConciergePanel({
                   onClick={() => handleShiftMonth(-1)}
                   disabled={!canGoPrevMonth}
                   aria-label="이전 달"
-                  className="w-9 h-9 rounded-lg border border-[#E5E0D8] bg-white flex items-center justify-center text-[#1C1917] hover:border-[#9A7B4F] disabled:opacity-35 disabled:pointer-events-none cursor-pointer"
+                  className="w-9 h-9 rounded-lg border border-[#C8BEB0] bg-white flex items-center justify-center text-[#1C1917] hover:border-[#9A7B4F] disabled:opacity-35 disabled:pointer-events-none cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -709,7 +709,7 @@ export function LiveConciergePanel({
                   type="button"
                   onClick={() => handleShiftMonth(1)}
                   aria-label="다음 달"
-                  className="w-9 h-9 rounded-lg border border-[#E5E0D8] bg-white flex items-center justify-center text-[#1C1917] hover:border-[#9A7B4F] cursor-pointer"
+                  className="w-9 h-9 rounded-lg border border-[#C8BEB0] bg-white flex items-center justify-center text-[#1C1917] hover:border-[#9A7B4F] cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -752,7 +752,7 @@ export function LiveConciergePanel({
                         : cell.isSelectable
                         ? cell.isToday
                           ? 'bg-white border-[#9A7B4F] text-[#1C1917] hover:bg-[#F2EFE9] cursor-pointer'
-                          : 'bg-white border-[#E5E0D8] text-[#1C1917] hover:border-[#9A7B4F] cursor-pointer'
+                          : 'bg-white border-[#C8BEB0] text-[#1C1917] hover:border-[#9A7B4F] cursor-pointer'
                         : 'bg-[#F2EFE9]/60 border-transparent text-[#A8A29E] cursor-not-allowed'
                     }`}
                   >
@@ -789,7 +789,7 @@ export function LiveConciergePanel({
             </div>
 
             {/* Time Slots for Selected Date */}
-            <div className="pt-3 border-t border-[#E5E0D8] space-y-2">
+            <div className="pt-3 border-t border-[#C8BEB0] space-y-2">
               <div className="flex items-center justify-between gap-2 text-xs">
                 <span className="inline-flex items-center gap-1.5 font-medium text-[#1C1917]">
                   <Clock className="w-3.5 h-3.5 text-[#9A7B4F]" />
@@ -815,8 +815,8 @@ export function LiveConciergePanel({
                         isActive
                           ? 'bg-[#1C1917] text-[#FAF9F6] border-[#1C1917] cursor-pointer'
                           : slot.disabled
-                          ? 'bg-[#F2EFE9]/70 text-[#A8A29E] border-[#E5E0D8]/70 cursor-not-allowed'
-                          : 'bg-white text-[#1C1917] border-[#E5E0D8] hover:border-[#9A7B4F] cursor-pointer'
+                          ? 'bg-[#F2EFE9]/70 text-[#A8A29E] border-[#C8BEB0]/70 cursor-not-allowed'
+                          : 'bg-white text-[#1C1917] border-[#C8BEB0] hover:border-[#9A7B4F] cursor-pointer'
                       }`}
                     >
                       <span className={slot.disabled ? 'line-through' : ''}>{slot.time}</span>
@@ -836,7 +836,7 @@ export function LiveConciergePanel({
               <select
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
-                className="w-full px-3.5 py-2 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                className="w-full px-3.5 py-2 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
               >
                 {PURPOSES.map((p) => (
                   <option key={p} value={p}>
@@ -850,7 +850,7 @@ export function LiveConciergePanel({
               <select
                 value={itemInterest}
                 onChange={(e) => setItemInterest(e.target.value)}
-                className="w-full px-3.5 py-2 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                className="w-full px-3.5 py-2 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
               >
                 <option value="">매장 방문 후 추천</option>
                 {menuItems.map((item) => (
@@ -869,7 +869,7 @@ export function LiveConciergePanel({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="반지 호수, 각인 문구, 희망 소재 등 미리 전달할 내용을 적어주세요."
-              className="w-full px-3.5 py-2 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+              className="w-full px-3.5 py-2 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
             />
           </div>
 
@@ -892,7 +892,7 @@ export function LiveConciergeSectionAndDrawer(props: LiveConciergeWidgetProps) {
   return (
     <>
       {/* Embedded Concierge Section */}
-      <section id="concierge" className="py-16 lg:py-24 border-t border-[#E5E0D8]">
+      <section id="concierge" className="py-16 lg:py-24 border-t border-[#C8BEB0]">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <div className="lg:col-span-5 space-y-5">
@@ -906,7 +906,7 @@ export function LiveConciergeSectionAndDrawer(props: LiveConciergeWidgetProps) {
                 방문 전 궁금한 시착 가능 여부, 커플링 사이즈 측정, 수선 견적 문의를 실시간 채팅으로 바로 남겨주세요. 예약 신청 시 매장 대기 현황과 즉시 동기화됩니다.
               </p>
 
-              <div className="pt-4 border-t border-[#E5E0D8] space-y-3 text-sm text-[#44403C]">
+              <div className="pt-4 border-t border-[#C8BEB0] space-y-3 text-sm text-[#44403C]">
                 <div>
                   <span className="font-medium text-[#1C1917] block">1:1 프라이빗 시착 예약</span>
                   <span className="text-xs text-[#78716C]">

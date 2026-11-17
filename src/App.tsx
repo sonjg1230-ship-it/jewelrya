@@ -45,6 +45,10 @@ export default function App() {
   const [mapsApiKey, setMapsApiKey] = useState<string>(
     () => (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined) || ''
   );
+  const [mapsConfigChecked, setMapsConfigChecked] = useState<boolean>(() =>
+    Boolean((import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined) || '')
+  );
+  const [mapsLoadFailed, setMapsLoadFailed] = useState<boolean>(false);
   const [shopCoords, setShopCoords] = useState<{ lat: number; lng: number }>(DEFAULT_COORDS);
   const [shopAddress, setShopAddress] = useState<string>(DEFAULT_SHOP_ADDRESS);
   const [naverPlaceUrl, setNaverPlaceUrl] = useState<string>(DEFAULT_NAVER_URL);
@@ -91,11 +95,16 @@ export default function App() {
       notificationPermission === 'granted' && notificationsEnabled;
   }, [notificationPermission, notificationsEnabled]);
 
-  // Listen to global Google Maps quota events
+  // Listen to global Google Maps quota and auth/referer fallback events
   useEffect(() => {
     const handleQuota = () => setQuotaExceeded(true);
+    const handleMapFallback = () => setMapsLoadFailed(true);
     window.addEventListener('gmp-quota-exceeded', handleQuota);
-    return () => window.removeEventListener('gmp-quota-exceeded', handleQuota);
+    window.addEventListener('gmp-map-fallback', handleMapFallback);
+    return () => {
+      window.removeEventListener('gmp-quota-exceeded', handleQuota);
+      window.removeEventListener('gmp-map-fallback', handleMapFallback);
+    };
   }, []);
 
   // 1-second tick for live KST business hours countdown dashboard
@@ -203,7 +212,10 @@ export default function App() {
           setNaverPlaceUrl(data.shop.naverPlaceUrl);
         }
       })
-      .catch((err) => console.error('Failed to load maps config:', err));
+      .catch((err) => console.error('Failed to load maps config:', err))
+      .finally(() => {
+        if (active) setMapsConfigChecked(true);
+      });
 
     safeFetchJson<{ hours: DayHours[]; menu: JewelryMenuItem[] }>('/api/shop')
       .then((data) => {
@@ -431,7 +443,7 @@ export default function App() {
       )}
 
       {/* Top Navigation Bar (Strict 3-Zone Contract, Compact Mobile Height <= 15% Viewport) */}
-      <header className="sticky top-0 z-40 h-14 sm:h-16 bg-[#FAF9F6]/95 backdrop-blur-sm border-b border-[#E5E0D8]">
+      <header className="sticky top-0 z-40 h-14 sm:h-16 bg-[#FAF9F6]/95 backdrop-blur-sm border-b border-[#C8BEB0]">
         <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 lg:px-10 flex items-center justify-between gap-4 sm:gap-8">
           {/* Zone 1: Single-element Brand Logo */}
           <a
@@ -489,7 +501,8 @@ export default function App() {
           hours={hours}
           businessStatus={businessStatus}
           googlePlaceInfo={googlePlaceInfo}
-          hasMapsKey={Boolean(mapsApiKey)}
+          hasMapsKey={Boolean(mapsApiKey) && !mapsLoadFailed}
+          mapsConfigChecked={mapsConfigChecked}
         />
 
         <ReviewsSection
@@ -523,7 +536,7 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-5 right-5 z-50 max-w-sm w-[calc(100%-2.5rem)] bg-white border border-[#D6CFC4] rounded-xl shadow-lg p-4 flex items-start gap-3"
+          className="fixed bottom-5 right-5 z-50 max-w-sm w-[calc(100%-2.5rem)] bg-white border border-[#B5A897] rounded-xl shadow-lg p-4 flex items-start gap-3"
         >
           <div className="w-8 h-8 rounded-lg bg-[#F2EFE9] flex items-center justify-center shrink-0">
             <Bell className="w-4 h-4 text-[#9A7B4F]" />
@@ -543,7 +556,7 @@ export default function App() {
         </div>
       )}
 
-      <footer className="border-t border-[#E5E0D8] bg-white py-10">
+      <footer className="border-t border-[#C8BEB0] bg-white py-10">
         <div className="max-w-7xl mx-auto px-6 lg:px-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-[#78716C]">
           <div className="space-y-2.5">
             <a href="#top" aria-label="Jewelrya 쥬얼리아 홈으로 이동" className="inline-block">
@@ -572,7 +585,7 @@ export default function App() {
     </div>
   );
 
-  if (!mapsApiKey) {
+  if (!mapsApiKey || mapsLoadFailed) {
     return mainContent;
   }
 
@@ -582,6 +595,7 @@ export default function App() {
       language="ko"
       region="KR"
       libraries={['places', 'routes', 'marker']}
+      onError={() => setMapsLoadFailed(true)}
     >
       {mainContent}
     </APIProvider>

@@ -96,6 +96,88 @@ export function ReviewsSection({
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const reviewsTrackRef = useRef<HTMLDivElement | null>(null);
+  const isScrollPausedRef = useRef<boolean>(false);
+  const resumeTimerRef = useRef<number | null>(null);
+  const scrollAccumulatorRef = useRef<number>(0);
+
+  const pauseAutoScroll = (autoResumeDelayMs?: number) => {
+    isScrollPausedRef.current = true;
+    if (resumeTimerRef.current) {
+      window.clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+    if (typeof autoResumeDelayMs === 'number') {
+      resumeTimerRef.current = window.setTimeout(() => {
+        isScrollPausedRef.current = false;
+      }, autoResumeDelayMs);
+    }
+  };
+
+  const resumeAutoScroll = () => {
+    if (resumeTimerRef.current) {
+      window.clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+    isScrollPausedRef.current = false;
+  };
+
+  useEffect(() => {
+    const el = reviewsTrackRef.current;
+    if (!el || reviews.length === 0) return;
+
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    let rafId = 0;
+    let lastTime = performance.now();
+    const SPEED_PX_PER_SEC = 40;
+
+    const step = (now: number) => {
+      const dt = Math.min(0.05, Math.max(0, (now - lastTime) / 1000));
+      lastTime = now;
+
+      if (!isScrollPausedRef.current && !lightboxState) {
+        scrollAccumulatorRef.current += SPEED_PX_PER_SEC * dt;
+        const delta = Math.floor(scrollAccumulatorRef.current);
+        if (delta >= 1) {
+          el.scrollLeft += delta;
+          scrollAccumulatorRef.current -= delta;
+          const halfWidth = el.scrollWidth / 2;
+          if (halfWidth > 0 && el.scrollLeft >= halfWidth) {
+            el.scrollLeft -= halfWidth;
+          }
+        }
+      }
+
+      rafId = window.requestAnimationFrame(step);
+    };
+
+    rafId = window.requestAnimationFrame(step);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      if (resumeTimerRef.current) {
+        window.clearTimeout(resumeTimerRef.current);
+      }
+    };
+  }, [reviews.length, lightboxState]);
+
+  const handleManualScroll = (direction: 'left' | 'right') => {
+    const el = reviewsTrackRef.current;
+    if (!el) return;
+    pauseAutoScroll(2200);
+    const stepSize = 360;
+    if (direction === 'left') {
+      if (el.scrollLeft <= 10 && el.scrollWidth > 0) {
+        el.scrollLeft += el.scrollWidth / 2;
+      }
+      el.scrollBy({ left: -stepSize, behavior: 'smooth' });
+    } else {
+      el.scrollBy({ left: stepSize, behavior: 'smooth' });
+    }
+  };
 
   useEffect(() => {
     if (!lightboxState) return;
@@ -217,11 +299,12 @@ export function ReviewsSection({
       setRating(5);
       setShowForm(false);
       setSubmitMessage('소중한 방문 리뷰가 등록되었습니다.');
+      reviewsTrackRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
     }
   };
 
   return (
-    <section id="reviews" className="py-16 lg:py-24 border-t border-[#E5E0D8] bg-[#F6F4EF]">
+    <section id="reviews" className="py-16 lg:py-24 border-t border-[#C8BEB0] bg-[#F6F4EF]">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
           <div>
@@ -248,21 +331,42 @@ export function ReviewsSection({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setShowForm((prev) => !prev);
-              setSubmitMessage(null);
-            }}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#1C1917] text-[#FAF9F6] text-sm font-medium rounded-lg hover:bg-[#332E2A] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            <PenLine className="w-4 h-4" />
-            <span>{showForm ? '작성 닫기' : '방문 리뷰 남기기'}</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="inline-flex items-center gap-1 mr-1">
+              <button
+                type="button"
+                onClick={() => handleManualScroll('left')}
+                aria-label="이전 리뷰 보기"
+                className="w-10 h-10 rounded-lg bg-white border border-[#C8BEB0] text-[#44403C] hover:border-[#9A7B4F] hover:text-[#1C1917] flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleManualScroll('right')}
+                aria-label="다음 리뷰 보기"
+                className="w-10 h-10 rounded-lg bg-white border border-[#C8BEB0] text-[#44403C] hover:border-[#9A7B4F] hover:text-[#1C1917] flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm((prev) => !prev);
+                setSubmitMessage(null);
+              }}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#1C1917] text-[#FAF9F6] text-sm font-medium rounded-lg hover:bg-[#332E2A] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <PenLine className="w-4 h-4" />
+              <span>{showForm ? '작성 닫기' : '방문 리뷰 남기기'}</span>
+            </button>
+          </div>
         </div>
 
         {submitMessage && (
-          <div className="mb-6 p-4 bg-white border border-[#D6CFC4] rounded-xl flex items-center gap-2 text-sm text-[#166534]">
+          <div className="mb-6 p-4 bg-white border border-[#B5A897] rounded-xl flex items-center gap-2 text-sm text-[#166534]">
             <Check className="w-4 h-4 shrink-0" />
             <span>{submitMessage}</span>
           </div>
@@ -271,7 +375,7 @@ export function ReviewsSection({
         {showForm && (
           <form
             onSubmit={handleSubmit}
-            className="mb-10 p-6 bg-white border border-[#E5E0D8] rounded-xl space-y-5"
+            className="mb-10 p-6 bg-white border border-[#C8BEB0] rounded-xl space-y-5"
           >
             <h3 className="text-base font-semibold text-[#1C1917]">쥬얼리아 방문 후기 작성</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -283,7 +387,7 @@ export function ReviewsSection({
                   value={authorName}
                   onChange={(e) => setAuthorName(e.target.value)}
                   placeholder="예: 김하늘"
-                  className="w-full px-3.5 py-2.5 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                  className="w-full px-3.5 py-2.5 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
                 />
               </div>
 
@@ -292,7 +396,7 @@ export function ReviewsSection({
                 <select
                   value={visitPurpose}
                   onChange={(e) => setVisitPurpose(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                  className="w-full px-3.5 py-2.5 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
                 >
                   {VISIT_PURPOSES.map((p) => (
                     <option key={p} value={p}>
@@ -307,7 +411,7 @@ export function ReviewsSection({
                 <select
                   value={purchasedItem}
                   onChange={(e) => setPurchasedItem(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                  className="w-full px-3.5 py-2.5 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
                 >
                   <option value="">선택 안 함</option>
                   {menuItems.map((item) => (
@@ -349,7 +453,7 @@ export function ReviewsSection({
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="매장 분위기, 상담 경험, 제품 착용감 등에 대한 솔직한 후기를 남겨주세요."
-                className="w-full px-3.5 py-2.5 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                className="w-full px-3.5 py-2.5 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
               />
             </div>
 
@@ -374,7 +478,7 @@ export function ReviewsSection({
                 className={`border border-dashed rounded-xl p-4 transition-colors ${
                   isDragging
                     ? 'border-[#9A7B4F] bg-[#F2EFE9]/70'
-                    : 'border-[#D6CFC4] bg-[#FAF9F6]'
+                    : 'border-[#B5A897] bg-[#FAF9F6]'
                 }`}
               >
                 <input
@@ -389,7 +493,7 @@ export function ReviewsSection({
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white border border-[#E5E0D8] flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-white border border-[#C8BEB0] flex items-center justify-center shrink-0">
                       <Camera className="w-4 h-4 text-[#9A7B4F]" />
                     </div>
                     <div className="text-xs text-[#57534E]">
@@ -406,7 +510,7 @@ export function ReviewsSection({
                     type="button"
                     disabled={attachedPhotos.length >= MAX_PHOTOS || isProcessingPhotos}
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 text-xs font-medium text-[#1C1917] bg-white border border-[#D6CFC4] hover:border-[#9A7B4F] disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                    className="px-4 py-2 text-xs font-medium text-[#1C1917] bg-white border border-[#B5A897] hover:border-[#9A7B4F] disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     {isProcessingPhotos ? '이미지 준비 중...' : '사진 파일 선택'}
                   </button>
@@ -417,11 +521,11 @@ export function ReviewsSection({
                 )}
 
                 {attachedPhotos.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-[#E5E0D8] grid grid-cols-3 sm:grid-cols-6 gap-3">
+                  <div className="mt-4 pt-4 border-t border-[#C8BEB0] grid grid-cols-3 sm:grid-cols-6 gap-3">
                     {attachedPhotos.map((photo) => (
                       <div
                         key={photo.id}
-                        className="relative aspect-square rounded-lg overflow-hidden border border-[#E5E0D8] bg-white group"
+                        className="relative aspect-square rounded-lg overflow-hidden border border-[#C8BEB0] bg-white group"
                       >
                         <img
                           src={photo.dataUrl}
@@ -462,88 +566,105 @@ export function ReviewsSection({
           </form>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {reviews.map((review) => (
-            <article
-              key={review.id}
-              className="flex flex-col justify-between p-6 bg-white border border-[#E5E0D8] rounded-xl"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-0.5" aria-label={`별점 ${review.rating}점`}>
-                    {Array.from({ length: 5 }).map((_, idx) => (
-                      <Star
-                        key={idx}
-                        className={`w-3.5 h-3.5 ${
-                          idx < review.rating ? 'fill-[#9A7B4F] text-[#9A7B4F]' : 'text-[#E5E0D8]'
-                        }`}
-                      />
-                    ))}
+        <div
+          ref={reviewsTrackRef}
+          onMouseEnter={() => pauseAutoScroll()}
+          onMouseLeave={() => resumeAutoScroll()}
+          onTouchStart={() => pauseAutoScroll()}
+          onTouchEnd={() => pauseAutoScroll(1200)}
+          onFocus={() => pauseAutoScroll()}
+          onBlur={() => resumeAutoScroll()}
+          className="flex flex-nowrap gap-5 overflow-x-auto pb-2 -mx-6 px-6 lg:mx-0 lg:px-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          aria-label="방문자 리뷰 가로 스크롤 목록"
+        >
+          {[...reviews, ...reviews].map((review, idx) => {
+            const isDuplicate = idx >= reviews.length;
+            return (
+              <article
+                key={`${review.id}-${idx}`}
+                aria-hidden={isDuplicate}
+                className="w-[82vw] max-w-[356px] sm:w-[356px] shrink-0 flex flex-col justify-between p-6 bg-white border border-[#C8BEB0] rounded-xl"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-0.5" aria-label={`별점 ${review.rating}점`}>
+                      {Array.from({ length: 5 }).map((_, starIdx) => (
+                        <Star
+                          key={starIdx}
+                          className={`w-3.5 h-3.5 ${
+                            starIdx < review.rating ? 'fill-[#9A7B4F] text-[#9A7B4F]' : 'text-[#E5E0D8]'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs text-[#78716C] tabular-nums">{review.createdAt}</span>
                   </div>
-                  <span className="text-xs text-[#78716C] tabular-nums">{review.createdAt}</span>
+
+                  {review.purchasedItem && (
+                    <p className="text-xs font-medium text-[#9A7B4F] mb-2">{review.purchasedItem}</p>
+                  )}
+
+                  <p className="text-sm text-[#44403C] leading-relaxed mb-4 line-clamp-4">
+                    {review.content}
+                  </p>
+
+                  {review.photos && review.photos.length > 0 && (
+                    <div
+                      className={`mb-5 grid gap-2 ${
+                        review.photos.length === 1
+                          ? 'grid-cols-1'
+                          : review.photos.length === 2
+                            ? 'grid-cols-2'
+                            : 'grid-cols-3'
+                      }`}
+                    >
+                      {review.photos.map((photoUrl, pIdx) => (
+                        <button
+                          key={photoUrl}
+                          type="button"
+                          tabIndex={isDuplicate ? -1 : undefined}
+                          onClick={() =>
+                            setLightboxState({
+                              photos: review.photos!,
+                              index: pIdx,
+                              caption: `${review.authorName}님의 ${review.purchasedItem || '방문 후기'} 사진`,
+                            })
+                          }
+                          className={`relative rounded-lg overflow-hidden border border-[#C8BEB0] bg-[#F2EFE9] cursor-pointer group ${
+                            review.photos!.length === 1 ? 'aspect-[4/3]' : 'aspect-square'
+                          }`}
+                        >
+                          <ResilientImage
+                            src={photoUrl}
+                            alt={`${review.authorName}님 구매 주얼리 사진 ${pIdx + 1}`}
+                            fallbackTitle="후기 사진"
+                            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {review.purchasedItem && (
-                  <p className="text-xs font-medium text-[#9A7B4F] mb-2">{review.purchasedItem}</p>
-                )}
-
-                <p className="text-sm text-[#44403C] leading-relaxed mb-4">{review.content}</p>
-
-                {review.photos && review.photos.length > 0 && (
-                  <div
-                    className={`mb-5 grid gap-2 ${
-                      review.photos.length === 1
-                        ? 'grid-cols-1'
-                        : review.photos.length === 2
-                          ? 'grid-cols-2'
-                          : 'grid-cols-3'
-                    }`}
-                  >
-                    {review.photos.map((photoUrl, pIdx) => (
-                      <button
-                        key={photoUrl}
-                        type="button"
-                        onClick={() =>
-                          setLightboxState({
-                            photos: review.photos!,
-                            index: pIdx,
-                            caption: `${review.authorName}님의 ${review.purchasedItem || '방문 후기'} 사진`,
-                          })
-                        }
-                        className={`relative rounded-lg overflow-hidden border border-[#E5E0D8] bg-[#F2EFE9] cursor-pointer group ${
-                          review.photos!.length === 1 ? 'aspect-[4/3]' : 'aspect-square'
-                        }`}
-                      >
-                        <ResilientImage
-                          src={photoUrl}
-                          alt={`${review.authorName}님 구매 주얼리 사진 ${pIdx + 1}`}
-                          fallbackTitle="후기 사진"
-                          className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-4 border-t border-[#F0ECE4] flex items-center gap-2 text-xs text-[#78716C]">
-                <span className="font-medium text-[#1C1917]">{review.authorName}</span>
-                <span aria-hidden="true">·</span>
-                <span>{review.visitPurpose}</span>
-                {review.verifiedVisit && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span>방문 인증</span>
-                  </>
-                )}
-              </div>
-            </article>
-          ))}
+                <div className="pt-4 border-t border-[#D6CCC0] flex items-center gap-2 text-xs text-[#78716C]">
+                  <span className="font-medium text-[#1C1917]">{review.authorName}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{review.visitPurpose}</span>
+                  {review.verifiedVisit && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span>방문 인증</span>
+                    </>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
 
         {/* Live Google Maps Reviews (shown only when returned by Google Places API) */}
         {googlePlaceInfo && googlePlaceInfo.googleReviews.length > 0 && (
-          <div className="mt-10 pt-10 border-t border-[#E5E0D8]">
+          <div className="mt-10 pt-10 border-t border-[#C8BEB0]">
             <div className="flex items-center justify-between gap-4 mb-5">
               <h3 className="text-base font-semibold text-[#1C1917]">
                 Google 지도 실시간 리뷰 ({googlePlaceInfo.matchedPlaceName || '쥬얼리아'})
@@ -561,7 +682,7 @@ export function ReviewsSection({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {googlePlaceInfo.googleReviews.map((gr, idx) => (
-                <article key={idx} className="p-5 bg-white border border-[#E5E0D8] rounded-xl">
+                <article key={idx} className="p-5 bg-white border border-[#C8BEB0] rounded-xl">
                   <div className="flex items-center justify-between text-xs text-[#78716C] mb-2">
                     <span className="font-medium text-[#1C1917]">{gr.authorName}</span>
                     <span>{gr.relativePublishTimeDescription}</span>

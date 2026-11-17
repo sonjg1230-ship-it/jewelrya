@@ -26,6 +26,13 @@ import {
 import type { DayHours, ResolvedGooglePlaceInfo } from '../shared/types';
 import type { KstBusinessStatus } from '../utils/shopAssets';
 import { useAutocompleteSuggestions } from '../hooks/useAutocompleteSuggestions';
+import { FallbackInteractiveMap } from './FallbackInteractiveMap';
+import {
+  fetchOsrmFallbackDirections,
+  PRESET_ORIGIN_COORDS,
+  searchOriginFallback,
+  type FallbackPlaceSuggestion,
+} from '../utils/routingFallback';
 
 type TravelModeOption = 'DRIVING' | 'TRANSIT' | 'WALKING';
 
@@ -53,6 +60,7 @@ interface VisitDirectionsSectionProps {
   businessStatus: KstBusinessStatus;
   googlePlaceInfo: ResolvedGooglePlaceInfo | null;
   hasMapsKey: boolean;
+  mapsConfigChecked: boolean;
 }
 
 const ORIGIN_PRESETS = ['월평역', '정부청사역', '갈마역', '대전역'];
@@ -158,27 +166,8 @@ function DirectionsMapController({
       }
 
       try {
-        const params = new URLSearchParams({
-          originLat: String(originLocation.lat),
-          originLng: String(originLocation.lng),
-          destLat: String(shopCoords.lat),
-          destLng: String(shopCoords.lng),
-          mode: travelMode,
-        });
-        const resp = await fetch(`/api/directions-fallback?${params.toString()}`);
+        const data = await fetchOsrmFallbackDirections(originLocation, shopCoords, travelMode);
         if (cancelled) return;
-        if (!resp.ok) {
-          throw new Error(`Fallback route status ${resp.status}`);
-        }
-        const data = (await resp.json()) as {
-          path: google.maps.LatLngLiteral[];
-          distanceMeters: number;
-          durationMillis: number;
-          steps: Array<{ instruction: string; distanceText: string }>;
-        };
-        if (!data.path || data.path.length === 0) {
-          throw new Error('Empty fallback path');
-        }
         onRouteLoadingChange(false);
         drawFallbackPolyline(data.path, data.distanceMeters, data.durationMillis, data.steps);
       } catch (fallbackErr) {
@@ -326,7 +315,7 @@ function DirectionsMapController({
           onClick={() => setSelectedNearby(spot)}
           title={spot.name}
         >
-          <div className="px-2 py-1 bg-white/95 border border-[#D6CFC4] rounded-md shadow-sm text-[11px] font-medium text-[#44403C] whitespace-nowrap">
+          <div className="px-2 py-1 bg-white/95 border border-[#B5A897] rounded-md shadow-sm text-[11px] font-medium text-[#44403C] whitespace-nowrap">
             {spot.name}
           </div>
         </AdvancedMarker>
@@ -355,6 +344,7 @@ export function VisitDirectionsSection({
   businessStatus,
   googlePlaceInfo,
   hasMapsKey,
+  mapsConfigChecked,
 }: VisitDirectionsSectionProps) {
   const placesLib = useMapsLibrary('places');
 
@@ -367,15 +357,59 @@ export function VisitDirectionsSection({
   const [routeLoading, setRouteLoading] = useState(false);
   const [geoLoading, setGeoLoading] = useState(false);
   const [nearbySpots, setNearbySpots] = useState<NearbySpot[]>([]);
+  const [fallbackSuggestions, setFallbackSuggestions] = useState<FallbackPlaceSuggestion[]>([]);
+  const [fallbackSearchLoading, setFallbackSearchLoading] = useState(false);
 
   const { suggestions, isLoading: autocompleteLoading, resetSession } = useAutocompleteSuggestions(
     originInput,
     shopCoords
   );
 
+  // Fallback origin search when Google Places library is not available (e.g. static Vercel deploy without key)
+  useEffect(() => {
+    if (placesLib) {
+      setFallbackSuggestions([]);
+      setFallbackSearchLoading(false);
+      return;
+    }
+
+    const trimmed = originInput.trim();
+    if (!trimmed || originInput === originLabel) {
+      setFallbackSuggestions([]);
+      setFallbackSearchLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setFallbackSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      searchOriginFallback(trimmed)
+        .then((list) => {
+          if (!cancelled) {
+            setFallbackSuggestions(list);
+            setFallbackSearchLoading(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setFallbackSuggestions([]);
+            setFallbackSearchLoading(false);
+          }
+        });
+    }, 280);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [placesLib, originInput, originLabel]);
+
   // Fetch nearby transit / parking stations dynamically via Places API (New)
   useEffect(() => {
-    if (!placesLib) return;
+    if (!placesLib || !hasMapsKey) {
+      setNearbySpots([]);
+      return;
+    }
     let cancelled = false;
 
     placesLib.Place.searchNearby({
@@ -410,7 +444,7 @@ export function VisitDirectionsSection({
     return () => {
       cancelled = true;
     };
-  }, [placesLib, shopCoords]);
+  }, [placesLib, hasMapsKey, shopCoords]);
 
   const handleSelectSuggestion = async (
     suggestion: google.maps.places.AutocompleteSuggestion
@@ -437,12 +471,28 @@ export function VisitDirectionsSection({
     }
   };
 
+  const handleSelectFallbackSuggestion = (item: FallbackPlaceSuggestion) => {
+    setRouteError(null);
+    setOriginLocation(item.location);
+    setOriginLabel(item.title);
+    setOriginInput(item.title);
+    setFallbackSuggestions([]);
+  };
+
   const handleSelectPresetOrigin = async (presetName: string) => {
-    if (!placesLib) {
-      setRouteError('지도 서비스가 아직 초기화 중입니다.');
+    setRouteError(null);
+    if (!placesLib || !hasMapsKey) {
+      const presetCoords = PRESET_ORIGIN_COORDS[presetName];
+      if (presetCoords) {
+        setOriginLocation(presetCoords);
+        setOriginLabel(presetName);
+        setOriginInput(presetName);
+        setFallbackSuggestions([]);
+      } else {
+        setRouteError(`'${presetName}' 좌표를 찾지 못했습니다.`);
+      }
       return;
     }
-    setRouteError(null);
     setRouteLoading(true);
     try {
       const { places } = await placesLib.Place.searchByText({
@@ -473,7 +523,14 @@ export function VisitDirectionsSection({
     } catch (err) {
       setRouteLoading(false);
       checkQuotaError(err);
-      setRouteError('출발지 검색 중 오류가 발생했습니다.');
+      const presetCoords = PRESET_ORIGIN_COORDS[presetName];
+      if (presetCoords) {
+        setOriginLocation(presetCoords);
+        setOriginLabel(presetName);
+        setOriginInput(presetName);
+      } else {
+        setRouteError('출발지 검색 중 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -509,7 +566,7 @@ export function VisitDirectionsSection({
   const googleDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${shopCoords.lat},${shopCoords.lng}`;
 
   return (
-    <section id="location" className="py-16 lg:py-24 border-t border-[#E5E0D8]">
+    <section id="location" className="py-16 lg:py-24 border-t border-[#C8BEB0]">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
           <div>
@@ -526,7 +583,7 @@ export function VisitDirectionsSection({
               href={naverPlaceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[#1C1917] bg-white border border-[#D6CFC4] hover:border-[#9A7B4F] rounded-lg transition-colors whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[#1C1917] bg-white border border-[#B5A897] hover:border-[#9A7B4F] rounded-lg transition-colors whitespace-nowrap shrink-0"
             >
               <span>네이버 플레이스 보기</span>
               <ExternalLink className="w-3.5 h-3.5 text-[#9A7B4F]" />
@@ -546,7 +603,7 @@ export function VisitDirectionsSection({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left: Interactive Google Map */}
           <div className="lg:col-span-7 space-y-4">
-            <div className="relative w-full h-[440px] lg:h-[580px] rounded-xl overflow-hidden border border-[#E5E0D8] bg-[#F2EFE9]">
+            <div className="relative w-full h-[440px] lg:h-[580px] rounded-xl overflow-hidden border border-[#C8BEB0] bg-[#F2EFE9]">
               {hasMapsKey ? (
                 <GoogleMap
                   mapId="DEMO_MAP_ID"
@@ -571,6 +628,18 @@ export function VisitDirectionsSection({
                     onRouteLoadingChange={setRouteLoading}
                   />
                 </GoogleMap>
+              ) : mapsConfigChecked ? (
+                <FallbackInteractiveMap
+                  shopCoords={shopCoords}
+                  resolvedAddress={resolvedAddress}
+                  naverPlaceUrl={naverPlaceUrl}
+                  originLocation={originLocation}
+                  originLabel={originLabel}
+                  travelMode={travelMode}
+                  onRouteComputed={setRouteSummary}
+                  onRouteError={setRouteError}
+                  onRouteLoadingChange={setRouteLoading}
+                />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
                   <MapPin className="w-8 h-8 text-[#9A7B4F] mb-3" />
@@ -583,8 +652,8 @@ export function VisitDirectionsSection({
             </div>
 
             {/* Nearby transit & landmarks discovered via Places API (New) */}
-            {nearbySpots.length > 0 && (
-              <div className="p-4 bg-white border border-[#E5E0D8] rounded-xl">
+            {hasMapsKey && nearbySpots.length > 0 && (
+              <div className="p-4 bg-white border border-[#C8BEB0] rounded-xl">
                 <p className="text-xs font-medium text-[#78716C] mb-2">
                   반경 1.2km 이내 인근 교통 · 주차 거점 (Google Places 실시간 탐색)
                 </p>
@@ -607,7 +676,7 @@ export function VisitDirectionsSection({
           {/* Right: Directions Planner + Business Hours */}
           <div className="lg:col-span-5 space-y-6">
             {/* Directions Control Card */}
-            <div className="p-6 bg-white border border-[#E5E0D8] rounded-xl space-y-5">
+            <div className="p-6 bg-white border border-[#C8BEB0] rounded-xl space-y-5">
               <div>
                 <h3 className="text-base font-semibold text-[#1C1917] mb-1">방문 경로 계산</h3>
                 <p className="text-xs text-[#78716C]">
@@ -628,36 +697,60 @@ export function VisitDirectionsSection({
                     value={originInput}
                     onChange={(e) => setOriginInput(e.target.value)}
                     placeholder="역명, 대학, 도로명 주소를 입력하세요"
-                    className="w-full pl-10 pr-24 py-2.5 text-sm bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
+                    className="w-full pl-10 pr-24 py-2.5 text-sm bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg focus:outline-none focus:border-[#9A7B4F]"
                   />
                   <button
                     type="button"
                     onClick={handleUseCurrentLocation}
                     disabled={geoLoading}
-                    className="absolute right-1.5 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#1C1917] bg-white border border-[#E5E0D8] hover:border-[#9A7B4F] rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                    className="absolute right-1.5 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#1C1917] bg-white border border-[#C8BEB0] hover:border-[#9A7B4F] rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     <LocateFixed className="w-3.5 h-3.5 text-[#9A7B4F]" />
                     <span>{geoLoading ? '확인 중' : '현위치'}</span>
                   </button>
                 </div>
 
-                {(suggestions.length > 0 || autocompleteLoading) && originInput !== originLabel && (
-                  <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-[#E5E0D8] rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                    {autocompleteLoading && suggestions.length === 0 ? (
-                      <div className="px-4 py-3 text-xs text-[#78716C]">주소 후보를 검색하는 중...</div>
-                    ) : (
-                      suggestions.map((s, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => void handleSelectSuggestion(s)}
-                          className="w-full text-left px-4 py-2.5 text-sm text-[#1C1917] hover:bg-[#FAF9F6] border-b last:border-b-0 border-[#F0ECE4] cursor-pointer"
-                        >
-                          {s.placePrediction?.text.text}
-                        </button>
-                      ))
-                    )}
-                  </div>
+                {placesLib ? (
+                  (suggestions.length > 0 || autocompleteLoading) &&
+                  originInput !== originLabel && (
+                    <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-[#C8BEB0] rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                      {autocompleteLoading && suggestions.length === 0 ? (
+                        <div className="px-4 py-3 text-xs text-[#78716C]">주소 후보를 검색하는 중...</div>
+                      ) : (
+                        suggestions.map((s, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => void handleSelectSuggestion(s)}
+                            className="w-full text-left px-4 py-2.5 text-sm text-[#1C1917] hover:bg-[#FAF9F6] border-b last:border-b-0 border-[#D6CCC0] cursor-pointer"
+                          >
+                            {s.placePrediction?.text.text}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )
+                ) : (
+                  (fallbackSuggestions.length > 0 || fallbackSearchLoading) &&
+                  originInput !== originLabel && (
+                    <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-[#C8BEB0] rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                      {fallbackSearchLoading && fallbackSuggestions.length === 0 ? (
+                        <div className="px-4 py-3 text-xs text-[#78716C]">출발지를 검색하는 중...</div>
+                      ) : (
+                        fallbackSuggestions.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleSelectFallbackSuggestion(item)}
+                            className="w-full text-left px-4 py-2.5 hover:bg-[#FAF9F6] border-b last:border-b-0 border-[#D6CCC0] cursor-pointer"
+                          >
+                            <span className="text-sm font-medium text-[#1C1917] block">{item.title}</span>
+                            <span className="text-[11px] text-[#78716C] block truncate">{item.subtitle}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )
                 )}
               </div>
 
@@ -673,7 +766,7 @@ export function VisitDirectionsSection({
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                         originLabel === preset
                           ? 'bg-[#1C1917] text-[#FAF9F6] border-[#1C1917]'
-                          : 'bg-[#FAF9F6] text-[#44403C] border-[#E5E0D8] hover:border-[#9A7B4F]'
+                          : 'bg-[#FAF9F6] text-[#44403C] border-[#C8BEB0] hover:border-[#9A7B4F]'
                       }`}
                     >
                       {preset}
@@ -683,7 +776,7 @@ export function VisitDirectionsSection({
               </div>
 
               {/* Travel Mode Segmented Control */}
-              <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#F2EFE9] rounded-lg border border-[#E5E0D8]">
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#F2EFE9] rounded-lg border border-[#C8BEB0]">
                 {(
                   [
                     { id: 'DRIVING', label: '자동차', Icon: Car },
@@ -710,14 +803,14 @@ export function VisitDirectionsSection({
 
               {/* Route Output */}
               {!originLocation && !routeLoading && !routeError && (
-                <div className="p-3.5 bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg text-xs text-[#57534E]">
+                <div className="p-3.5 bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg text-xs text-[#57534E]">
                   위에서 출발지(예: 월평역, 정부청사역 또는 현위치)를 선택하시면 지도 위에{' '}
                   {travelMode === 'DRIVING' ? '자동차' : travelMode === 'WALKING' ? '도보' : '대중교통'} 경로가 안내됩니다.
                 </div>
               )}
 
               {routeLoading && (
-                <div className="p-4 bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg text-xs text-[#57534E]">
+                <div className="p-4 bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg text-xs text-[#57534E]">
                   최적 방문 경로를 계산하고 있습니다...
                 </div>
               )}
@@ -729,8 +822,8 @@ export function VisitDirectionsSection({
               )}
 
               {routeSummary && !routeLoading && (
-                <div className="p-4 bg-[#FAF9F6] border border-[#E5E0D8] rounded-lg space-y-3">
-                  <div className="flex items-center justify-between gap-4 pb-3 border-b border-[#E5E0D8]">
+                <div className="p-4 bg-[#FAF9F6] border border-[#C8BEB0] rounded-lg space-y-3">
+                  <div className="flex items-center justify-between gap-4 pb-3 border-b border-[#C8BEB0]">
                     <div>
                       <span className="text-xs text-[#78716C] block">예상 소요 시간</span>
                       <span className="text-xl font-semibold text-[#1C1917] tabular-nums">
@@ -765,7 +858,7 @@ export function VisitDirectionsSection({
             </div>
 
             {/* Business Hours Card with Live Status & Countdown Dashboard */}
-            <div id="hours" className="p-5 sm:p-6 bg-white border border-[#E5E0D8] rounded-xl space-y-4">
+            <div id="hours" className="p-5 sm:p-6 bg-white border border-[#C8BEB0] rounded-xl space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-[#9A7B4F]" />
@@ -780,25 +873,25 @@ export function VisitDirectionsSection({
               <div
                 className={`business-status-card rounded-2xl border overflow-hidden ${
                   businessStatus.isOpen
-                    ? 'bg-[#F5FBF7] border-[#BBE2C8]'
-                    : 'bg-[#FAF8F4] border-[#E5E0D8]'
+                    ? 'bg-[#F5FBF7] border-[#88C29E]'
+                    : 'bg-[#FAF8F4] border-[#C8BEB0]'
                 }`}
               >
                 {/* Status Header with Dedicated Status Icon */}
                 <div
                   className={`px-4 py-3.5 border-b flex items-center justify-between gap-3 ${
                     businessStatus.isOpen
-                      ? 'bg-[#EAF6EE] border-[#C6E6D0]'
-                      : 'bg-[#F3EFE8] border-[#E5E0D8]'
+                      ? 'bg-[#EAF6EE] border-[#96CBA9]'
+                      : 'bg-[#F3EFE8] border-[#C8BEB0]'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
                         businessStatus.isOpen
-                          ? 'bg-white border-[#BBE2C8] text-[#166534]'
+                          ? 'bg-white border-[#88C29E] text-[#166534]'
                           : businessStatus.statusLabel === '오늘 휴무'
-                          ? 'bg-white border-[#D6CFC4] text-[#78716C]'
+                          ? 'bg-white border-[#B5A897] text-[#78716C]'
                           : 'bg-white border-[#E5D3B3] text-[#7D623C]'
                       }`}
                     >
@@ -836,7 +929,7 @@ export function VisitDirectionsSection({
                 <div className="p-4 space-y-3.5">
                   {/* Hierarchical Open / Close Time Split Grid */}
                   <div className="grid grid-cols-2 gap-2.5">
-                    <div className="bg-white border border-[#E5E0D8] rounded-xl p-3 flex flex-col justify-between">
+                    <div className="bg-white border border-[#C8BEB0] rounded-xl p-3 flex flex-col justify-between">
                       <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#78716C]">
                         <Sunrise className="w-3.5 h-3.5 text-[#9A7B4F] shrink-0" />
                         <span className="truncate">{businessStatus.openTimeLabel}</span>
@@ -846,7 +939,7 @@ export function VisitDirectionsSection({
                       </span>
                     </div>
 
-                    <div className="bg-white border border-[#E5E0D8] rounded-xl p-3 flex flex-col justify-between">
+                    <div className="bg-white border border-[#C8BEB0] rounded-xl p-3 flex flex-col justify-between">
                       <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#78716C]">
                         <Sunset className="w-3.5 h-3.5 text-[#9A7B4F] shrink-0" />
                         <span className="truncate">{businessStatus.closeTimeLabel}</span>
@@ -875,26 +968,26 @@ export function VisitDirectionsSection({
                       }`}
                     >
                       {businessStatus.countdownParts.days > 0 && (
-                        <div className="bg-white border border-[#E5E0D8] rounded-xl py-2.5 px-2 text-center">
+                        <div className="bg-white border border-[#C8BEB0] rounded-xl py-2.5 px-2 text-center">
                           <span className="text-xl sm:text-2xl font-semibold text-[#1C1917] tabular-nums leading-none block">
                             {businessStatus.countdownParts.days}
                           </span>
                           <span className="text-[11px] text-[#78716C] mt-1 block">일</span>
                         </div>
                       )}
-                      <div className="bg-white border border-[#E5E0D8] rounded-xl py-2.5 px-2 text-center">
+                      <div className="bg-white border border-[#C8BEB0] rounded-xl py-2.5 px-2 text-center">
                         <span className="text-xl sm:text-2xl font-semibold text-[#1C1917] tabular-nums leading-none block">
                           {String(businessStatus.countdownParts.hours).padStart(2, '0')}
                         </span>
                         <span className="text-[11px] text-[#78716C] mt-1 block">시간</span>
                       </div>
-                      <div className="bg-white border border-[#E5E0D8] rounded-xl py-2.5 px-2 text-center">
+                      <div className="bg-white border border-[#C8BEB0] rounded-xl py-2.5 px-2 text-center">
                         <span className="text-xl sm:text-2xl font-semibold text-[#1C1917] tabular-nums leading-none block">
                           {String(businessStatus.countdownParts.minutes).padStart(2, '0')}
                         </span>
                         <span className="text-[11px] text-[#78716C] mt-1 block">분</span>
                       </div>
-                      <div className="bg-white border border-[#E5E0D8] rounded-xl py-2.5 px-2 text-center">
+                      <div className="bg-white border border-[#C8BEB0] rounded-xl py-2.5 px-2 text-center">
                         <span
                           className={`text-xl sm:text-2xl font-semibold tabular-nums leading-none block ${
                             businessStatus.isOpen ? 'text-[#166534]' : 'text-[#9A7B4F]'
@@ -939,7 +1032,7 @@ export function VisitDirectionsSection({
                 </div>
               </div>
 
-              <ul className="divide-y divide-[#F0ECE4] text-sm">
+              <ul className="divide-y divide-[#D6CCC0] text-sm">
                 {hours.map((row) => {
                   const isToday = row.dayIndex === businessStatus.currentDayIndex;
                   return (

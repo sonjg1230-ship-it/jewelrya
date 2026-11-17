@@ -290,7 +290,7 @@ export function TodayPicksSection({
       </div>
 
       {/* 6-Item Mobile Quick Menu Directly Below Hero */}
-      <div className="bg-white border-b border-[#E5E0D8]">
+      <div className="bg-white border-b border-[#C8BEB0]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-5">
           <div
             className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3"
@@ -311,7 +311,7 @@ export function TodayPicksSection({
                   className={`min-h-[76px] px-2.5 py-2.5 rounded-xl border flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer ${
                     active
                       ? 'bg-[#1C1917] border-[#1C1917] text-[#FAF9F6] shadow-sm'
-                      : 'bg-[#FAF9F6] border-[#E5E0D8] text-[#1C1917] hover:border-[#9A7B4F]'
+                      : 'bg-[#FAF9F6] border-[#C8BEB0] text-[#1C1917] hover:border-[#9A7B4F]'
                   }`}
                 >
                   <Icon
@@ -356,7 +356,7 @@ export function TodayPicksSection({
             return (
               <article
                 key={item.id}
-                className="w-[76vw] max-w-[296px] shrink-0 snap-start sm:w-auto sm:max-w-none group flex flex-col bg-white border border-[#E5E0D8] rounded-xl overflow-hidden transition-all duration-200 hover:shadow-md"
+                className="w-[76vw] max-w-[296px] shrink-0 snap-start sm:w-auto sm:max-w-none group flex flex-col bg-white border border-[#C8BEB0] rounded-xl overflow-hidden transition-all duration-200 hover:shadow-md"
               >
                 <div className="aspect-[4/3] bg-[#F2EFE9] overflow-hidden">
                   <ResilientImage
@@ -388,7 +388,7 @@ export function TodayPicksSection({
                     {item.todayPickNote || item.description}
                   </p>
 
-                  <div className="pt-3 border-t border-[#F0ECE4] flex items-center justify-between gap-2.5">
+                  <div className="pt-3 border-t border-[#D6CCC0] flex items-center justify-between gap-2.5">
                     <span className="text-[15px] font-semibold text-[#1C1917] tabular-nums whitespace-nowrap">
                       {formatKrw(item.priceKrw)}
                     </span>
@@ -407,7 +407,7 @@ export function TodayPicksSection({
         </div>
 
         {/* Compact Mobile Store Quick-Info Bar */}
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 sm:p-5 bg-white border border-[#E5E0D8] rounded-xl">
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 sm:p-5 bg-white border border-[#C8BEB0] rounded-xl">
           <a
             href="#location"
             className="flex items-start gap-3 min-h-[44px] hover:opacity-85 transition-opacity"
@@ -422,7 +422,7 @@ export function TodayPicksSection({
           </a>
           <a
             href="#hours"
-            className="flex items-start gap-3 min-h-[44px] pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l sm:pl-5 border-[#EFECE6] hover:opacity-85 transition-opacity"
+            className="flex items-start gap-3 min-h-[44px] pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l sm:pl-5 border-[#D6CCC0] hover:opacity-85 transition-opacity"
           >
             <Clock className="w-4 h-4 text-[#9A7B4F] shrink-0 mt-0.5" />
             <div className="min-w-0">
