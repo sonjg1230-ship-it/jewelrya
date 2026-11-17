@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Gem } from 'lucide-react';
 
 interface ResilientImageProps {
@@ -10,6 +10,10 @@ interface ResilientImageProps {
 
 export function ResilientImage({ src, alt, className = '', fallbackTitle }: ResilientImageProps) {
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
 
   if (!src || hasError) {
     return (

@@ -13,7 +13,12 @@ import type {
   ServerWsEvent,
   VisitorReview,
 } from './shared/types';
-import { getKstBusinessStatus } from './utils/shopAssets';
+import {
+  DEFAULT_MENU_ITEMS,
+  DEFAULT_VISITOR_REVIEWS,
+  DEFAULT_WEEKLY_HOURS,
+  getKstBusinessStatus,
+} from './utils/shopAssets';
 import { TodayPicksSection } from './components/TodayPicksSection';
 import { VisitDirectionsSection } from './components/VisitDirectionsSection';
 import { ReviewsSection } from './components/ReviewsSection';
@@ -25,6 +30,14 @@ const DEFAULT_SHOP_ADDRESS = '대전 서구 월평동로 83 다모아아파트�
 const DEFAULT_NAVER_URL =
   'https://map.naver.com/p/entry/place/1009953930?placePath=%2Fhome%3Fentry%3Dplt%26from%3Dmap%26fromPanelNum%3D1%26additionalHeight%3D76%26timestamp%3D202611152137%26locale%3Dko%26svcName%3Dmap_pcv5&searchType=place&lng=127.3675956&lat=36.3626833&c=15.00,0,0,0,dh';
 
+async function safeFetchJson<T>(url: string): Promise<T | null> {
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) return null;
+  return (await res.json()) as T;
+}
+
 export default function App() {
   // Demo Key quota exhaustion state (Case A requirement)
   const [quotaExceeded, setQuotaExceeded] = useState(false);
@@ -35,9 +48,9 @@ export default function App() {
   const [shopCoords, setShopCoords] = useState<{ lat: number; lng: number }>(DEFAULT_COORDS);
   const [shopAddress, setShopAddress] = useState<string>(DEFAULT_SHOP_ADDRESS);
   const [naverPlaceUrl, setNaverPlaceUrl] = useState<string>(DEFAULT_NAVER_URL);
-  const [hours, setHours] = useState<DayHours[]>([]);
-  const [menuItems, setMenuItems] = useState<JewelryMenuItem[]>([]);
-  const [reviews, setReviews] = useState<VisitorReview[]>([]);
+  const [hours, setHours] = useState<DayHours[]>(DEFAULT_WEEKLY_HOURS);
+  const [menuItems, setMenuItems] = useState<JewelryMenuItem[]>(DEFAULT_MENU_ITEMS);
+  const [reviews, setReviews] = useState<VisitorReview[]>(DEFAULT_VISITOR_REVIEWS);
   const [googlePlaceInfo, setGooglePlaceInfo] = useState<ResolvedGooglePlaceInfo | null>(null);
 
   // Real-time WebSocket state
@@ -177,50 +190,48 @@ export default function App() {
   useEffect(() => {
     let active = true;
 
-    fetch('/api/maps-config')
-      .then((res) => res.json())
-      .then(
-        (data: {
-          apiKey?: string;
-          shop?: { address?: string; lat: number; lng: number; naverPlaceUrl: string };
-        }) => {
-          if (!active) return;
-          if (data.apiKey) setMapsApiKey(data.apiKey);
-          if (data.shop) {
-            if (data.shop.address) setShopAddress(data.shop.address);
-            setShopCoords({ lat: data.shop.lat, lng: data.shop.lng });
-            setNaverPlaceUrl(data.shop.naverPlaceUrl);
-          }
+    safeFetchJson<{
+      apiKey?: string;
+      shop?: { address?: string; lat: number; lng: number; naverPlaceUrl: string };
+    }>('/api/maps-config')
+      .then((data) => {
+        if (!active || !data) return;
+        if (data.apiKey) setMapsApiKey(data.apiKey);
+        if (data.shop) {
+          if (data.shop.address) setShopAddress(data.shop.address);
+          setShopCoords({ lat: data.shop.lat, lng: data.shop.lng });
+          setNaverPlaceUrl(data.shop.naverPlaceUrl);
         }
-      )
+      })
       .catch((err) => console.error('Failed to load maps config:', err));
 
-    fetch('/api/shop')
-      .then((res) => res.json())
-      .then((data: { hours: DayHours[]; menu: JewelryMenuItem[] }) => {
-        if (!active) return;
-        setHours(data.hours ?? []);
-        setMenuItems(data.menu ?? []);
+    safeFetchJson<{ hours: DayHours[]; menu: JewelryMenuItem[] }>('/api/shop')
+      .then((data) => {
+        if (!active || !data) return;
+        if (Array.isArray(data.hours) && data.hours.length > 0) setHours(data.hours);
+        if (Array.isArray(data.menu) && data.menu.length > 0) setMenuItems(data.menu);
       })
       .catch((err) => console.error('Failed to load shop catalog:', err));
 
-    fetch('/api/reviews')
-      .then((res) => res.json())
-      .then((data: { reviews: VisitorReview[] }) => {
-        if (!active) return;
-        setReviews(data.reviews ?? []);
+    safeFetchJson<{ reviews: VisitorReview[] }>('/api/reviews')
+      .then((data) => {
+        if (!active || !data) return;
+        if (Array.isArray(data.reviews) && data.reviews.length > 0) setReviews(data.reviews);
       })
       .catch((err) => console.error('Failed to load reviews:', err));
 
     fetch('/api/place-resolve')
-      .then((res) => {
+      .then(async (res) => {
         if (res.status === 429) {
           setQuotaExceeded(true);
         }
-        return res.json();
+        if (!res.ok) return null;
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) return null;
+        return (await res.json()) as ResolvedGooglePlaceInfo;
       })
-      .then((data: ResolvedGooglePlaceInfo) => {
-        if (!active) return;
+      .then((data) => {
+        if (!active || !data) return;
         if (data.quotaExceeded) {
           setQuotaExceeded(true);
         }
